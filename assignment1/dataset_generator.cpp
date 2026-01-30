@@ -4,6 +4,9 @@
 #include <cstdlib>
 #include <ctime>
 #include <chrono>
+#include <fstream>
+#include <cmath>
+
 
 using namespace std;
 
@@ -92,42 +95,57 @@ int greedy_SD(vector<pair<int,int>> intervals) {
    MAIN: Benchmarking
 --------------------------------------------------- */
 int main() {
-    srand(time(0));  // seed once
+    srand(time(0));
 
-    int n = 65536;       // increase for bigger tests
+    ofstream out("results.csv");
+    out << "n,alpha,EFT_time,EST_time,SD_time,EFT_size,EST_size,SD_size\n";
+
+    vector<int> sizes = {1024, 2048, 4096, 8192, 16384, 32768, 65536};
+    vector<double> alphas = {0.1, 1, 5};  // High, Medium, Low overlap
+
     double D = 10;
-    double alpha = 1;   // Medium overlap
+    int repeats = 50;  // number of timing repeats
+    volatile int sink; // prevent optimization
 
-    auto intervals = generate_intervals(n, D, alpha);
+    for(double alpha : alphas) {
+        for(int n : sizes) {
 
-    volatile int sink;   // prevents compiler optimization
-    int repeats = 100;   // repeat runs for stable timing
+            auto intervals = generate_intervals(n, D, alpha);
 
-    // ---- Time EFT ----
-    auto start = chrono::high_resolution_clock::now();
-    for(int i = 0; i < repeats; i++)
-        sink = greedy_EFT(intervals);
-    auto end = chrono::high_resolution_clock::now();
-    double eft_time = chrono::duration<double, micro>(end - start).count() / repeats;
+            // ---- EFT Timing ----
+            auto start = chrono::high_resolution_clock::now();
+            for(int i = 0; i < repeats; i++)
+                sink = greedy_EFT(intervals);
+            auto end = chrono::high_resolution_clock::now();
+            double eft_time = chrono::duration<double, micro>(end - start).count() / repeats;
 
-    // ---- Time EST ----
-    start = chrono::high_resolution_clock::now();
-    for(int i = 0; i < repeats; i++)
-        sink = greedy_EST(intervals);
-    end = chrono::high_resolution_clock::now();
-    double est_time = chrono::duration<double, micro>(end - start).count() / repeats;
+            // ---- EST Timing ----
+            start = chrono::high_resolution_clock::now();
+            for(int i = 0; i < repeats; i++)
+                sink = greedy_EST(intervals);
+            end = chrono::high_resolution_clock::now();
+            double est_time = chrono::duration<double, micro>(end - start).count() / repeats;
 
-    // ---- Time SD ----
-    start = chrono::high_resolution_clock::now();
-    for(int i = 0; i < repeats; i++)
-        sink = greedy_SD(intervals);
-    end = chrono::high_resolution_clock::now();
-    double sd_time = chrono::duration<double, micro>(end - start).count() / repeats;
+            // ---- SD Timing ----
+            start = chrono::high_resolution_clock::now();
+            for(int i = 0; i < repeats; i++)
+                sink = greedy_SD(intervals);
+            end = chrono::high_resolution_clock::now();
+            double sd_time = chrono::duration<double, micro>(end - start).count() / repeats;
 
-    cout << "n = " << n << endl;
-    cout << "EFT selected: " << greedy_EFT(intervals) << " | Avg Time: " << eft_time << " microseconds\n";
-    cout << "EST selected: " << greedy_EST(intervals) << " | Avg Time: " << est_time << " microseconds\n";
-    cout << "SD selected:  " << greedy_SD(intervals)  << " | Avg Time: " << sd_time  << " microseconds\n";
+            int eft_size = greedy_EFT(intervals);
+            int est_size = greedy_EST(intervals);
+            int sd_size  = greedy_SD(intervals);
 
+            out << n << "," << alpha << ","
+                << eft_time << "," << est_time << "," << sd_time << ","
+                << eft_size << "," << est_size << "," << sd_size << "\n";
+
+            cout << "Done n=" << n << " alpha=" << alpha << endl;
+        }
+    }
+
+    out.close();
+    cout << "Results saved to results.csv\n";
     return 0;
 }
